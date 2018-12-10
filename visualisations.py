@@ -41,7 +41,7 @@ def plot_fair_metrics(fair_metrics):
         plt.subplot(1, 5, i+1)
         ax = sns.barplot(x=fair_metrics.index[1:3], y=fair_metrics.iloc[1:3][cols[i]])
 
-        for j in range(0,2):
+        for j in range(0,len(fair_metrics)-1):
             a, val = ax.patches[j], fair_metrics.iloc[j+1][cols[i]]
             marg = -0.2 if val < 0 else 0.1
             ax.text(a.get_x()+a.get_width()/5, a.get_y()+a.get_height()+marg, round(val, 3), fontsize=15,color='black')
