@@ -3,9 +3,12 @@ import numpy as np
 from aif360.datasets import StandardDataset
 from aif360.metrics import BinaryLabelDatasetMetric, ClassificationMetric
 
-def fair_metrics(dataset, pred):
-    dataset_pred = dataset.copy()
-    dataset_pred.labels = pred
+def fair_metrics(dataset, pred, pred_is_dataset=False):
+    if pred_is_dataset:
+        dataset_pred = pred
+    else:
+        dataset_pred = dataset.copy()
+        dataset_pred.labels = pred
     
     cols = ['statistical_parity_difference', 'equal_opportunity_difference', 'average_abs_odds_difference',  'disparate_impact', 'theil_index']
     obj_fairness = [[0,0,0,1,0]]
