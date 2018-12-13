@@ -71,7 +71,7 @@ def plot_bar(data, column, color='#2980b9', orientation='h', type=None):
     x, y = (data.values, data.index) if orientation == 'h' else (data.index, data.values)
     trace = go.Bar(x=x, y=y, marker=dict(color=color)
                    , opacity=0.9, orientation=orientation)
-    layout = go.Layout(barmode='group', title='Bar plot for the ' + column + ' column', xaxis=dict(type=type))
+    layout = go.Layout(barmode='group', title='Bar plot for the ' + column + ' column', xaxis=dict(type=type), yaxis=go.layout.YAxis(automargin=True))
     fig = go.Figure([trace], layout=layout)
     py.iplot(fig)
 
@@ -212,3 +212,26 @@ def plot_compare_model_performance(algo_metrics):
     plt.legend(loc="lower right")
     display(perf_metrics.sort_values(by=['Accuracy', 'F1 Score'], ascending=[False, False]))
     plt.show()
+
+
+def plot_lime_importance(exp):
+    importance = exp.as_list()
+    importance.reverse()
+
+    colors, x, y = list(), list(), list()
+
+    for feat, val in importance:
+        if val < 0:
+            colors.append('#3498db')
+        else:
+            colors.append('#e67e22')
+        x.append(np.abs(val))
+        y.append(feat)
+
+    trace = go.Bar(x=x, y=y, marker=dict(color=colors)
+                   , opacity=0.9, orientation='h')
+    layout = go.Layout(barmode='group',
+                       title='Importance for the current prediction',
+                       yaxis=go.layout.YAxis(automargin=True))
+    fig = go.Figure([trace], layout=layout)
+    py.iplot(fig)
