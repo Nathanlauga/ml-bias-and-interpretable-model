@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from aif360.datasets import StandardDataset
 from aif360.metrics import BinaryLabelDatasetMetric, ClassificationMetric
+from sklearn.metrics import confusion_matrix, accuracy_score, f1_score, roc_curve, auc
 
 def fair_metrics(dataset, pred, pred_is_dataset=False):
     if pred_is_dataset:
@@ -42,3 +43,43 @@ def fair_metrics(dataset, pred, pred_is_dataset=False):
         fair_metrics = fair_metrics.append(row)    
         
     return fair_metrics
+
+
+def get_model_performance(X_test, y_true, y_pred, probs):
+    accuracy = accuracy_score(y_true, y_pred)
+    matrix = confusion_matrix(y_true, y_pred)
+    f1 = f1_score(y_true, y_pred)
+    preds = probs[:, 1]
+    fpr, tpr, threshold = roc_curve(y_true, preds)
+    roc_auc = auc(fpr, tpr)
+
+    return accuracy, matrix, f1, fpr, tpr, roc_auc
+
+
+def score_fair_metrics(fair):
+    objective = [0, 0, 0, 1, 0]
+    max_valid = [0.1, 0.1, 0.1, 1.2, 0.25]
+    min_valid = [-0.1, -0.1, -0.1, 0.8, 0]
+
+    nb_valid = np.sum(((fair.values > min_valid) * (fair.values < max_valid)), axis=1)
+    score = np.sum(np.abs(fair.values - objective), axis=1)
+    score = np.array([score, nb_valid])
+
+    score = pd.DataFrame(data=score.transpose(), columns=['score', 'nb_valid'], index=fair.index)
+    return score
+
+
+def score_all_attr(algo_metrics):
+    attributes = algo_metrics.loc['Origin', 'fair_metrics'].index.values[1:]
+
+    all_scores = np.zeros((len(algo_metrics), 2))
+    for attr in attributes:
+        df_metrics = pd.DataFrame(columns=algo_metrics.loc['Origin', 'fair_metrics'].columns.values)
+        for fair in algo_metrics.loc[:, 'fair_metrics']:
+            df_metrics = df_metrics.append(fair.loc[attr], ignore_index=True)
+        all_scores = all_scores + score_fair_metrics(df_metrics).values
+
+    final = pd.DataFrame(data=all_scores, columns=['score', 'nb_valid'], index=algo_metrics.index)
+    return final
+
+

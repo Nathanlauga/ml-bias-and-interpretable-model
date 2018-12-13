@@ -2,6 +2,16 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 plt.style.use('seaborn-white')
 import seaborn as sns
+import plotly.offline as py
+py.init_notebook_mode(connected=True)
+import plotly.graph_objs as go
+import plotly.tools as tls
+import plotly.figure_factory as ff
+
+from metrics import get_model_performance
+
+import pandas as pd
+import numpy as np
 
 from IPython.display import Markdown, display
 
@@ -53,3 +63,152 @@ def plot_fair_metrics(fair_metrics):
         plt.title(cols[i])
         ax.set_ylabel('')    
         ax.set_xlabel('')
+
+
+def plot_bar(data, column, color='#2980b9', orientation='h', type=None):
+    data = data[column].dropna().value_counts(ascending=True)
+
+    x, y = (data.values, data.index) if orientation == 'h' else (data.index, data.values)
+    trace = go.Bar(x=x, y=y, marker=dict(color=color)
+                   , opacity=0.9, orientation=orientation)
+    layout = go.Layout(barmode='group', title='Bar plot for the ' + column + ' column', xaxis=dict(type=type))
+    fig = go.Figure([trace], layout=layout)
+    py.iplot(fig)
+
+
+def plot_histo(data, column, type=None):
+    trace = go.Histogram(x=data[column].dropna())
+    layout = go.Layout(title='Histogram of the ' + column + ' column'
+                       , yaxis=dict(type=type, autorange=True))
+    fig = go.Figure([trace], layout=layout)
+    py.iplot(fig)
+
+
+def plot_model_performance(model, X_test, y_true):
+    y_pred = model.predict(X_test)
+    probs = model.predict_proba(X_test)
+    accuracy, matrix, f1, fpr, tpr, roc_auc = get_model_performance(X_test, y_true, y_pred, probs)
+
+    display(Markdown('#### Accuracy of the model :'))
+    print(accuracy)
+    display(Markdown('#### F1 score of the model :'))
+    print(f1)
+
+    fig = plt.figure(figsize=(15, 6))
+    ax = fig.add_subplot(1, 2, 1)
+    sns.heatmap(matrix, annot=True, cmap='Blues', fmt='g')
+    plt.title('Confusion Matrix')
+
+    ax = fig.add_subplot(1, 2, 2)
+    lw = 2
+    plt.plot(fpr, tpr, color='darkorange', lw=lw, label='ROC curve (area = %0.2f)' % roc_auc)
+    plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver Operating Characteristic curve')
+    plt.legend(loc="lower right")
+
+
+def plot_fair_metrics_plotly(fair_metrics):
+    bottom = [-1, -1, -1, 0, 0]
+    max_valid = [0.1, 0.1, 0.1, 1.2, 0.25]
+    min_valid = [-0.1, -0.1, -0.1, 0.8, 0]
+    cols = fair_metrics.columns.values
+
+    for i in range(0, 5):
+        col = cols[i]
+
+        x, y = (fair_metrics[col].values, fair_metrics.index)
+        colors = []
+        for v in x:
+            color = '#e74c3c' if v < min_valid[i] or v > max_valid[i] else '#2ecc71'
+            colors.append(color)
+
+        trace = go.Bar(x=x, y=y, marker=dict(color=colors)
+                       , opacity=0.9, orientation='h')
+
+        layout = go.Layout(barmode='group',
+                           title=col,
+                           xaxis=dict(range=[bottom[i], bottom[i] + 2]),
+                           yaxis=go.layout.YAxis(automargin=True),
+                           shapes=[
+                               {
+                                   'type': 'line',
+                                   'x0': min_valid[i],
+                                   'y0': -1,
+                                   'x1': min_valid[i],
+                                   'y1': len(y),
+                                   'line': {
+                                       'color': 'rgb(0, 0, 0)',
+                                       'width': 2,
+                                   },
+                               }, {
+                                   'type': 'line',
+                                   'x0': max_valid[i],
+                                   'y0': -1,
+                                   'x1': max_valid[i],
+                                   'y1': len(y),
+                                   'line': {
+                                       'color': 'rgb(0, 0, 0)',
+                                       'width': 2,
+                                   },
+                               }])
+        fig = go.Figure([trace], layout=layout)
+        py.iplot(fig)
+
+
+def plot_score_fair_metrics(score):
+    display(score.sort_values(['nb_valid', 'score'], ascending=[0, 1]))
+    score.sort_values(['nb_valid', 'score'], ascending=[1, 0], inplace=True)
+
+    gold, silver, bronze, other = ('#FFA400', '#bdc3c7', '#cd7f32', '#3498db')
+    colors = [gold if i == 0 else silver if i == 1 else bronze if i == 2 else other for i in range(0, len(score))]
+    colors = [c for c in reversed(colors)]
+
+    x, y = (score['score'].values, score.index)
+
+    trace = go.Bar(x=x, y=y, marker=dict(color=colors)
+                   , opacity=0.9, orientation='h')
+    layout = go.Layout(barmode='group',
+                       title='Fairest algorithm',
+                       yaxis=go.layout.YAxis(automargin=True))
+    fig = go.Figure([trace], layout=layout)
+    py.iplot(fig)
+
+
+
+def plot_compare_model_performance(algo_metrics):
+    X_test = data_orig_test.features
+    y_true = data_orig_test.labels
+    perf_metrics = pd.DataFrame()
+
+    models_name = algo_metrics.index.values
+
+    fig = plt.figure(figsize=(7, 7))
+    plt.title('ROC curve for differents models')
+    lw = 2
+    palette = sns.color_palette("Paired")
+
+    for model_name, i in zip(models_name, range(0, len(models_name))):
+        model = algo_metrics.loc[model_name, 'model']
+
+        if model_name != 'AdvDebiasing':
+            probs = algo_metrics.loc[model_name, 'probs']
+            y_pred = algo_metrics.loc[model_name, 'prediction']
+            accuracy, matrix, f1, fpr, tpr, roc_auc = get_model_performance(X_test, y_true, y_pred, probs)
+
+            perf_metrics = perf_metrics.append(
+                pd.DataFrame([[accuracy, f1]], columns=['Accuracy', 'F1 Score'], index=[model_name]))
+            plt.plot(fpr, tpr, color=palette[i], lw=lw, label=str(model_name) + ' (area = %0.2f)' % roc_auc)
+
+    plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver Operating Characteristic curve')
+    plt.legend(loc="lower right")
+    display(perf_metrics.sort_values(by=['Accuracy', 'F1 Score'], ascending=[False, False]))
+    plt.show()
