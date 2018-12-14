@@ -179,9 +179,9 @@ def plot_score_fair_metrics(score):
 
 
 
-def plot_compare_model_performance(algo_metrics):
-    X_test = data_orig_test.features
-    y_true = data_orig_test.labels
+def plot_compare_model_performance(algo_metrics, dataset):
+    X_test = dataset.features
+    y_true = dataset.labels
     perf_metrics = pd.DataFrame()
 
     models_name = algo_metrics.index.values
@@ -235,3 +235,30 @@ def plot_lime_importance(exp):
                        yaxis=go.layout.YAxis(automargin=True))
     fig = go.Figure([trace], layout=layout)
     py.iplot(fig)
+
+
+def plot_global_importance_lime(importance, title, is_abs=False):
+    colors, x = list(), list()
+    y = importance.abs().sort_values(ascending=True).index
+    importance.sort_values(ascending=True, inplace=True)
+
+    if not is_abs:
+        for feat in y.values:
+            if importance[feat] < 0:
+                colors.append('#3498db')
+            else:
+                colors.append('#e67e22')
+            x.append(np.abs(importance[feat]))
+    else:
+        x = importance.values
+        colors = '#3498db'
+
+    trace = go.Bar(x=x, y=y, marker=dict(color=colors)
+                   , opacity=0.9, orientation='h')
+    layout = go.Layout(barmode='group',
+                       title=title,
+                       yaxis=go.layout.YAxis(automargin=True))
+    fig = go.Figure([trace], layout=layout)
+    py.iplot(fig)
+
+
